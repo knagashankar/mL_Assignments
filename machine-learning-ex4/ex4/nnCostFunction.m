@@ -1,0 +1,155 @@
+function [J grad] = nnCostFunction(nn_params, ...
+                                 input_layer_size, ...
+                                 hidden_layer_size, ...
+                                 num_labels, ...
+                                 X, y, lambda)
+%NNCOSTFUNCTION Implements the neural network cost function for a two layer
+%neural network which performs classification
+%   [J grad] = NNCOSTFUNCTON(nn_params, hidden_layer_size, num_labels, ...
+%   X, y, lambda) computes the cost and gradient of the neural network. The
+%   parameters for the neural network are "unrolled" into the vector
+%   nn_params and need to be converted back into the weight matrices. 
+% 
+%   The returned parameter grad should be a "unrolled" vector of the
+%   partial derivatives of the neural network.
+%
+
+% Reshape nn_params back into the parameters Theta1 and Theta2, the weight matrices
+% for our 2 layer neural network
+  Theta1 = reshape(nn_params(1:hidden_layer_size * (input_layer_size + 1)), ...
+                  hidden_layer_size, (input_layer_size + 1));
+
+  Theta2 = reshape(nn_params((1 + (hidden_layer_size * (input_layer_size + 1))):end), ...
+                  num_labels, (hidden_layer_size + 1));
+% Setup some useful variables
+  m = size(X, 1);
+
+% You need to return the following variables correctly 
+  J = 0;
+  Theta1_grad = zeros(size(Theta1));
+  Theta2_grad = zeros(size(Theta2));
+
+%% ====================== YOUR CODE HERE ======================
+% Instructions: You should complete the code by working through the
+%               following parts.
+%
+% Part 1: Feedforward the neural network and return the cost in the
+%         variable J. After implementing Part 1, you can verify that your
+%         cost function computation is correct by verifying the cost
+%         computed in ex4.m
+%
+%
+  % ============================== Part - 1 =================================
+  % adding bias unit for input
+  a1 = [ones(m,1), X];
+  % a1 = m x ILu+1
+  % 5000 x 401
+  
+  %% calculating input for hidden layer  
+  % HLu = number of hidden layer units
+  % OLu = number of output layer units
+  
+  a2 = [ones(m,1), sigmoid(a1 * Theta1')]; % Theta1 = HLu x (ILu+1)
+  
+  % a1*Theta1' = (m x ILu+1) * (ILu+1 x HLu) = 5000x401 * 401x25
+  % adding bias column to a2 = 5000 x 26 = m x (HLunits+1)
+  
+  %% calculating input for output layer
+  h = sigmoid(a2 * Theta2'); % Theta2 is OLu x (HLu+1)
+  % h = (m x HLu+1) * (HLu+1 x OLu) = m x OLu = 5000x 10
+  
+  %% converting each element of output vector to
+  % a vector containing binary values corresponding label
+  % Ex : y values 3 is converted to binary vector containing 1 at third position
+  % y = 0 0 1 0 0 ... 0
+  
+  yVec = []; % initiating empty matrix
+  
+  for i = 1:m
+    yVec = [yVec ; y(i,1)== 1:num_labels];
+  end
+  % yVec = m x num_labels = 5000 x 10
+  
+  cost = -yVec .* log(h) - (1 - yVec) .* log(1 - h);
+  % cost = m x num_labels
+  
+  J = (1 / m) * sum(sum(cost));
+  
+% Part 2: Implement the backpropagation algorithm to compute the gradients
+%         Theta1_grad and Theta2_grad. You should return the partial derivatives of
+%         the cost function with respect to Theta1 and Theta2 in Theta1_grad and
+%         Theta2_grad, respectively. After implementing Part 2, you can check
+%         that your implementation is correct by running checkNNGradients
+%
+%         Note: The vector y passed into the function is a vector of labels
+%               containing values from 1..K. You need to map this vector into a 
+%               binary vector of 1's and 0's to be used with the neural network
+%               cost function.
+%
+%         Hint: We recommend implementing backpropagation using a for-loop
+%               over the training examples if you are implementing it for the 
+%               first time.
+  % ============================== Part - 2 ===============================
+  [m, ILu] = size(X);    %X      = m   x ILu
+  HLu = size(Theta1, 1); %Theta1 = HLu x ILu+1
+  OLu = size(Theta2, 1); %Theta2 = OLu x HLu+1
+  
+  %penality = (lambda/2m) * (sum of theta1^2 + sum of theta2^2)
+  sum1 = sum(sum([zeros(HLu,1), Theta1(:,2:end)].^2));
+  sum2 = sum(sum([zeros(OLu,1), Theta2(:,2:end)].^2));
+  
+  % inserting 0 column before 2:end columns of theta
+  % .^2 squaring each element
+  % first sum() is column wise addition = 1 x columns
+  % second sum() is row wise addition of resultant = 1x1  
+  
+  penality = (lambda/ (2*m) ) * (sum1 + sum2);
+  
+  J = J + penality;
+
+% Part 3: Implement regularization with the cost function and gradients.
+%
+%         Hint: You can implement this around the code for
+%               backpropagation. That is, you can compute the gradients for
+%               the regularization separately and then add them to Theta1_grad
+%               and Theta2_grad from Part 2.
+% 
+  % ======================== Part - 3 ===============================
+  delta3 = zeros(size(yVec));     % m x OLu
+  delta2 = zeros(size(Theta2));   % OLu x HLu+1
+  delta1 = zeros(size(Theta1));   % HLu x ILu+1
+  % inittaializing delta values
+  
+  delta3 = h - yVec; % delta3 = m x num_labels = 5000 x 10
+  
+  % removing bias from a2
+  Theta2_grad = (delta3' * a2)/m;
+  % num_labels x m * m x HLu+1
+  % 10 x 5000 * 5000 x 26 = 10 x 26
+  
+  % theta1_grad = a1 * delta2
+  
+  % delta2 = (theta2 * delta3).* derivative(z2)
+  % m x HLu, 2:end columns to remove bias
+  % 5000 x 25
+  
+  delta2 = ( delta3 * Theta2(:, 2:end) ).* sigmoidGradient(a1 * Theta1');
+  % ( m x OLu * OLu x HLu ).* m x HLu
+  % (5000 x 10 * 10 x 25) .* (5000 x 25) = 5000 x 25
+  
+  Theta1_grad = (delta2' * a1)/m;
+  % HLu x ILu+1 = HLu x m * m x ILu+1
+  % 25 x 401 = 25 x 5000 * 5000 x 401
+  
+  % adding regularisation to gradient
+  Theta1_grad = Theta1_grad + (lambda/m) * [zeros(size(Theta1,1),1), Theta1(:,2:end)];
+  Theta2_grad = Theta2_grad + (lambda/m) * [zeros(size(Theta2,1),1), Theta2(:,2:end)];
+% -------------------------------------------------------------
+
+%% =========================================================================
+
+% Unroll gradients
+  grad = [Theta1_grad(:) ; Theta2_grad(:)];
+
+
+end
